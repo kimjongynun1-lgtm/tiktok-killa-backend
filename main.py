@@ -88,13 +88,18 @@ def search_tiktok(
                         if current_time - create_time > 86400 * 90:
                             continue
 
+                    # 업로드 후 며칠 지났는지 계산 (올림 처리)
+                    age_seconds = current_time - create_time
+                    age_days = max(1, (age_seconds + 86399) // 86400) # 1일 미만도 1일로 표시
+
                     # 프론트엔드 데이터 규격에 맞게 매핑
                     results.append({
                         "id": item.get('video_id'),
                         "title": item.get('title'),
                         "views": format_count(play_count),
                         "author": f"@{item.get('author', {}).get('unique_id', 'unknown')}",
-                        "video_url": item.get('play') # 순수 MP4 링크
+                        "video_url": item.get('play'), # 순수 MP4 링크
+                        "age_days": age_days
                     })
     except Exception as e:
         print(f"Error fetching from TikWM: {e}")
