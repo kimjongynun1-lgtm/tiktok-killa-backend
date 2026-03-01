@@ -5,6 +5,7 @@ import urllib.parse
 import json
 import ssl
 import time
+from deep_translator import GoogleTranslator
 
 app = FastAPI()
 
@@ -29,11 +30,13 @@ def format_count(count):
 @app.get("/api/search")
 def search_tiktok(
     q: str = Query(..., description="Search keyword"),
+    platform: str = Query("tiktok", description="Platform (tiktok or douyin)"),
     views_filter: str = Query("all", description="Views filter (e.g. 100k-300k, 300k-500k, 500k-1m, 1m+)"),
     period_filter: str = Query("all", description="Period filter (1d, 1w, 1m, 3m)")
 ):
     encoded_kw = urllib.parse.quote(q)
-    url = f"https://www.tikwm.com/api/feed/search?keywords={encoded_kw}&count=30&cursor=0"
+    domain_param = "&domain=2" if platform == "douyin" else ""
+    url = f"https://www.tikwm.com/api/feed/search?keywords={encoded_kw}&count=30&cursor=0{domain_param}"
     
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -97,6 +100,18 @@ def search_tiktok(
         print(f"Error fetching from TikWM: {e}")
         
     return results
+
+@app.get("/api/translate")
+def translate_keyword(
+    q: str = Query(..., description="Text to translate"),
+    target: str = Query(..., description="Target language code (e.g., 'zh-CN', 'en')")
+):
+    try:
+        translated = GoogleTranslator(source='auto', target=target).translate(q)
+        return {"original": q, "translated": translated}
+    except Exception as e:
+        print(f"Translation Error: {e}")
+        return {"original": q, "translated": q}  # Fallback to original
 
 if __name__ == "__main__":
     import uvicorn
