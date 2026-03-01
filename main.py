@@ -36,71 +36,88 @@ def search_tiktok(
 ):
     encoded_kw = urllib.parse.quote(q)
     domain_param = "&domain=2" if platform == "douyin" else ""
-    # Increase count to 50 to gather more candidates for strict filtering
-    url = f"https://www.tikwm.com/api/feed/search?keywords={encoded_kw}&count=100&cursor=0{domain_param}"
     
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
     
-    req = urllib.request.Request(
-        url, 
-        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'}
-    )
-    
     results = []
+    cursor = 0
+    max_pages = 5
+    page_count = 0
     
-    try:
-        with urllib.request.urlopen(req, context=ctx) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            if data.get('code') == 0:
-                videos = data.get('data', {}).get('videos', [])
-                for item in videos:
-                    title = item.get('title', '')
-                    # 엄격한 키워드 필터링: 원본 검색어(q)가 제목(설명)에 최소한 부분문자열로 들어있어야 함
-                    if q.lower() not in title.lower():
-                        continue
-
-                    play_count = item.get('play_count', 0)
-                    
-                    # 조회수 필터링 로직
-                    if views_filter == '100k+':
-                        if play_count < 100000:
-                            continue
-
-                    # 기간 필터링 로직 (create_time은 보통 Unix Timestamp 초 단위)
-                    create_time = item.get('create_time', 0)
-                    current_time = int(time.time())
-                    
-                    if period_filter == '1d': # 24시간 이내
-                        if current_time - create_time > 86400:
-                            continue
-                    elif period_filter == '1w': # 6일 이내
-                        if current_time - create_time > 86400 * 6:
-                            continue
-                    elif period_filter == '1m': # 한달(30일) 이내
-                        if current_time - create_time > 86400 * 30:
-                            continue
-                    elif period_filter == '3m': # 3개월(90일) 이내
-                        if current_time - create_time > 86400 * 90:
-                            continue
-
-                    # 업로드 후 며칠 지났는지 계산 (올림 처리)
-                    age_seconds = current_time - create_time
-                    age_days = max(1, (age_seconds + 86399) // 86400) # 1일 미만도 1일로 표시
-
-                    # 프론트엔드 데이터 규격에 맞게 매핑
-                    results.append({
-                        "id": item.get('video_id'),
-                        "title": item.get('title'),
-                        "views": format_count(play_count),
-                        "author": f"@{item.get('author', {}).get('unique_id', 'unknown')}",
-                        "video_url": item.get('play'), # 순수 MP4 링크
-                        "age_days": age_days
-                    })
-    except Exception as e:
-        print(f"Error fetching from TikWM: {e}")
+    while len(results) < 30 and page_count < max_pages:
+        url = f"https://www.tikwm.com/api/feed/search?keywords={encoded_kw}&count=100&cursor={cursor}{domain_param}"
+        req = urllib.request.Request(
+            url, 
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'}
+        )
         
+        try:
+            with urllib.request.urlopen(req, context=ctx) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                if data.get('code') == 0:
+                    videos = data.get('data', {}).get('videos', [])
+                    for item in videos:
+                        title = item.get('title', '')
+                        # 엄격한 키워드 필터링: 원본 검색어(q)가 제목(설명)에 최소한 부분문자열로 들어있어야 함
+                        if q.lower() not in title.lower():
+                            continue
+    
+                        play_count = item.get('play_count', 0)
+                        
+                        # 조회수 필터링 로직
+                        if views_filter == '100k+':
+                            if play_count < 100000:
+                                continue
+    
+                        # 기간 필터링 로직 (create_time은 보통 Unix Timestamp 초 단위)
+                        create_time = item.get('create_time', 0)
+                        current_time = int(time.time())
+                        
+                        if period_filter == '1d': # 24시간 이내
+                            if current_time - create_time > 86400:
+                                continue
+                        elif period_filter == '1w': # 6일 이내
+                            if current_time - create_time > 86400 * 6:
+                                continue
+                        elif period_filter == '1m': # 한달(30일) 이내
+                            if current_time - create_time > 86400 * 30:
+                                continue
+                        elif period_filter == '3m': # 3개월(90일) 이내
+                            if current_time - create_time > 86400 * 90:
+                                continue
+    
+                        # 업로드 후 며칠 지났는지 계산 (올림 처리)
+                        age_seconds = current_time - create_time
+                        age_days = max(1, (age_seconds + 86399) // 86400) # 1일 미만도 1일로 표시
+    
+                        # 중복 확인
+                        if item.get('video_id') not in [r['id'] for r in results]:
+                            results.append({
+                                "id": item.get('video_id'),
+                                "title": item.get('title'),
+                                "views": format_count(play_count),
+                                "author": f"@{item.get('author', {}).get('unique_id', 'unknown')}",
+                                "video_url": item.get('play'), # 순수 MP4 링크
+                                "age_days": age_days
+                            })
+                            
+                            if len(results) >= 30:
+                                break
+                    
+                    cursor = data.get('data', {}).get('cursor', 0)
+                    if cursor == 0 or not data.get('data', {}).get('hasMore'):
+                        break
+                else:
+                    break
+        except Exception as e:
+            print(f"Error fetching from TikWM: {e}")
+            break
+            
+        page_count += 1
+        time.sleep(1) # Be nice to API
+
     return results
 
 @app.get("/api/translate")
