@@ -58,8 +58,8 @@ def search_tiktok(
                     play_count = item.get('play_count', 0)
                     
                     # 조회수 필터링 로직
-                    if views_filter == '100k-300k':
-                        if not (100000 <= play_count < 300000):
+                    if views_filter == '100k+':
+                        if play_count < 100000:
                             continue
                     elif views_filter == '300k-500k':
                         if not (300000 <= play_count < 500000):
