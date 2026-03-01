@@ -67,15 +67,6 @@ def search_tiktok(
                     if views_filter == '100k+':
                         if play_count < 100000:
                             continue
-                    elif views_filter == '300k-500k':
-                        if not (300000 <= play_count < 500000):
-                            continue
-                    elif views_filter == '500k-1m':
-                        if not (500000 <= play_count < 1000000):
-                            continue
-                    elif views_filter == '1m+':
-                        if play_count < 1000000:
-                            continue
 
                     # 기간 필터링 로직 (create_time은 보통 Unix Timestamp 초 단위)
                     create_time = item.get('create_time', 0)
