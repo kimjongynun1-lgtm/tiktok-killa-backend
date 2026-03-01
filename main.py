@@ -36,7 +36,8 @@ def search_tiktok(
 ):
     encoded_kw = urllib.parse.quote(q)
     domain_param = "&domain=2" if platform == "douyin" else ""
-    url = f"https://www.tikwm.com/api/feed/search?keywords={encoded_kw}&count=30&cursor=0{domain_param}"
+    # Increase count to 50 to gather more candidates for strict filtering
+    url = f"https://www.tikwm.com/api/feed/search?keywords={encoded_kw}&count=100&cursor=0{domain_param}"
     
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -55,6 +56,11 @@ def search_tiktok(
             if data.get('code') == 0:
                 videos = data.get('data', {}).get('videos', [])
                 for item in videos:
+                    title = item.get('title', '')
+                    # 엄격한 키워드 필터링: 원본 검색어(q)가 제목(설명)에 최소한 부분문자열로 들어있어야 함
+                    if q.lower() not in title.lower():
+                        continue
+
                     play_count = item.get('play_count', 0)
                     
                     # 조회수 필터링 로직
